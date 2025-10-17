@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Herramienta de Brainstorming Colaborativa</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- html2canvas y jsPDF (UMD) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #e0f2f7; min-height:100vh; display:flex; flex-direction:column; }
+        .container { flex-grow:1; display:flex; flex-direction:column; }
+        .tool-content { background:#fff; border-radius:.75rem; box-shadow:0 10px 15px -3px rgba(0,0,0,.15),0 4px 6px -2px rgba(0,0,0,.08); padding:2rem; flex-grow:1; overflow-y:auto; }
+        .sticky-note { border-radius:.75rem; box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -1px rgba(0,0,0,.06); padding:1rem; position:relative; min-height:8rem; display:flex; flex-direction:column; justify-content:space-between; }
+        .sticky-note.yellow{ background:#fffacd !important; border:1px solid #ffd700 !important; }
+        .sticky-note.blue{ background:#e0ffff !important; border:1px solid #00ced1 !important; }
+        .sticky-note.green{ background:#f0fff0 !important; border:1px solid #3cb371 !important; }
+        .sticky-note.pink{ background:#ffe4e1 !important; border:1px solid #ff69b4 !important; }
+        .sticky-note textarea{ width:100%; background:transparent; border:none; resize:none; font-size:1rem; line-height:1.5; color:#333; flex-grow:1; padding:.25rem; }
+        .sticky-note textarea:focus{ outline:none; }
+        .delete-button{ position:absolute; top:.5rem; right:.5rem; background:#ef4444; color:white; border:none; border-radius:9999px; width:1.5rem; height:1.5rem; display:flex; align-items:center; justify-content:center; font-size:.875rem; cursor:pointer; transition:background-color .2s; }
+        .delete-button:hover{ background:#dc2626; }
+        .add-button{ background:#8a2be2; color:white; padding:.75rem 1.5rem; border-radius:.75rem; font-weight:600; cursor:pointer; transition:background-color .2s, transform .1s; display:flex; align-items:center; gap:.5rem; box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -1px rgba(0,0,0,.06); }
+        .add-button:hover{ background:#7b1fa2; transform:translateY(-2px); }
+        .add-button:active{ transform:translateY(0); box-shadow:none; }
+        .color-palette{ display:flex; gap:.5rem; margin-top:1rem; margin-bottom:1rem; justify-content:center; }
+        .color-swatch{ width:2.5rem; height:2.5rem; border-radius:9999px; cursor:pointer; border:2px solid transparent; transition:border-color .2s, transform .1s; }
+        .color-swatch.selected{ border-color:#6a0dad; transform:scale(1.1); }
+        details{ margin-bottom:1.5rem; background:#f3e5f5; border-radius:.75rem; padding:1rem; border:1px solid #d1c4e9; }
+        summary{ font-weight:600; cursor:pointer; color:#6a0dad; padding:.5rem 0; display:flex; align-items:center; }
+        summary .arrow-icon{ display:inline-block; margin-left:.5rem; transition:transform .2s; font-size:.75rem; color:#8a2be2; }
+        details[open] summary .arrow-icon{ transform:rotate(180deg); }
+        .case-use-textarea{ width:100%; min-height:5rem; padding:.75rem; border:1px solid #cbd5e0; border-radius:.5rem; resize:vertical; font-size:1rem; color:#4a5568; margin-top:1rem; margin-bottom:1.5rem; }
+        .spinner{ border:4px solid rgba(0,0,0,.1); border-left-color:#8a2be2; border-radius:50%; width:24px; height:24px; animation:spin 1s linear infinite; display:inline-block; }
+        @keyframes spin{ 0%{ transform:rotate(0deg);} 100%{ transform:rotate(360deg);} }
+        .clear-button{ background:#dc2626; color:white; padding:.75rem 1.5rem; border-radius:.75rem; font-weight:600; cursor:pointer; }
+        .download-button{ background:#3b82f6; color:white; padding:.75rem 1.5rem; border-radius:.75rem; font-weight:600; cursor:pointer; }
+        .team-id-section{ display:flex; justify-content:center; align-items:center; gap:.5rem; margin-bottom:1.5rem; padding:1rem; background:#f3e5f5; border-radius:.75rem; }
+        .modal-overlay{ position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; z-index:1000; display:none; }
+        .modal-content{ background:white; padding:2rem; border-radius:.75rem; box-shadow:0 10px 25px rgba(0,0,0,.1); width:90%; max-width:400px; text-align:center; }
+        .modal-content input{ width:100%; padding:.75rem; border:1px solid #d1d5db; border-radius:.5rem; margin-top:1rem; margin-bottom:1rem; }
+        .modal-buttons{ display:flex; justify-content:flex-end; gap:.75rem; margin-top:1.5rem; }
+        .modal-buttons button{ padding:.5rem 1rem; border-radius:.5rem; font-weight:600; cursor:pointer; border:none; }
+        .modal-buttons .confirm-btn{ background:#2563eb; color:white; }
+        .modal-buttons .cancel-btn{ background:#d1d5db; color:#1f2937; }
+    </style>
+</head>
+<body class="p-4 flex flex-col min-h-screen">
+    <div class="container mx-auto flex flex-col flex-grow">
+        <h1 class="text-4xl font-bold text-center text-gray-800 mb-4 mt-4">Herramienta de Brainstorming Colaborativa</h1>
+        <p class="text-center text-gray-600 mb-4 max-w-2xl mx-auto">
+            Genera, organiza y comparte ideas con tu equipo en tiempo real usando notas adhesivas virtuales.
+        </p>
+
+        <div id="authStatus" class="text-center text-sm text-gray-500 mb-2">
+            Conectando... <span class="spinner"></span>
+        </div>
+
+        <div class="team-id-section">
+            <label for="teamIdInput" class="font-semibold text-gray-700">ID de Equipo:</label>
+            <input type="text" id="teamIdInput" placeholder="Ej: EquipoMarketing, ProyectoAlfa" class="p-2 border rounded-md" />
+            <button id="setTeamIdBtn" class="bg-purple-700 text-white p-2 rounded-md font-semibold">Establecer Equipo</button>
+        </div>
+
+        <div id="currentTeamIdDisplay" class="text-center text-sm text-gray-500 mb-6">
+            Equipo actual: <span class="font-semibold text-purple-700">public_default_team</span>
+        </div>
+
+        <div id="brainstorming" class="tool-content">
+            <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">Tu Tablero de Ideas</h2>
+            <details open>
+                <summary>Guía de Uso <span class="arrow-icon">&#9660;</span></summary>
+                <p><strong>Propósito:</strong> Fomentar la creatividad y la generación rápida de ideas sin juicios.</p>
+                <ul>
+                    <li><strong>ID de Equipo:</strong> Ingresa un nombre de equipo único para crear o unirte a un tablero colaborativo.</li>
+                    <li><strong>Caso de Uso:</strong> Define el tema o el objetivo principal de tu sesión de brainstorming.</li>
+                    <li><strong>Seleccionar Color:</strong> Elige un color de la paleta antes de añadir una nota.</li>
+                    <li><strong>Añadir Nota:</strong> Haz clic en el botón "Añadir Nota" para crear una nueva nota.</li>
+                    <li><strong>Eliminar Nota:</strong> Haz clic en el icono "x" en la esquina superior derecha de una nota para borrarla.</li>
+                    <li>Los cambios se guardan y sincronizan automáticamente para todos en el mismo equipo (si la conexión y reglas lo permiten).</li>
+                </ul>
+            </details>
+
+            <textarea id="brainstormingCaseUse" class="case-use-textarea" placeholder="Describe el caso de uso para esta sesión de Brainstorming (Ej: Generar ideas para una nueva campaña de marketing)."></textarea>
+
+            <div class="flex justify-center gap-4 mb-4">
+                <button id="clearBrainstormingBtn" class="clear-button flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                    Limpiar Tablero
+                </button>
+                <button id="downloadBrainstormingPdfBtn" class="download-button flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg>
+                    Descargar PDF
+                </button>
+            </div>
+
+            <div class="flex flex-col items-center mb-8 mt-4">
+                <div class="color-palette">
+                    <div class="color-swatch yellow selected" style="background-color:#fffacd; border:1px solid #ffd700;" data-color="yellow"></div>
+                    <div class="color-swatch blue" style="background-color:#e0ffff; border:1px solid #00ced1;" data-color="blue"></div>
+                    <div class="color-swatch green" style="background-color:#f0fff0; border:1px solid #3cb371;" data-color="green"></div>
+                    <div class="color-swatch pink" style="background-color:#ffe4e1; border:1px solid #ff69b4;" data-color="pink"></div>
+                </div>
+                <button id="addNoteBtn" class="add-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                    Añadir Nota
+                </button>
+            </div>
+
+            <div id="notesContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 p-4">
+                <!-- Sticky notes se añaden aquí -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal contraseña -->
+    <div id="passwordModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold text-gray-800">Confirmación Requerida</h3>
+            <p class="text-gray-600 mt-2">Por favor, introduce la contraseña para limpiar el tablero.</p>
+            <input type="password" id="passwordInput" placeholder="Contraseña" />
+            <p id="passwordError" class="text-red-500 text-sm mt-1" style="display:none;">Contraseña incorrecta.</p>
+            <div class="modal-buttons">
+                <button id="cancelClearBtn" class="cancel-btn">Cancelar</button>
+                <button id="confirmClearBtn" class="confirm-btn">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script principal -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Config Firebase (corrige storageBucket)
+        const firebaseConfig = {
+            apiKey: "AIzaSyB2B2DSJHSIzsyxMB-4K8B-QxENYeNEaz4",
+            authDomain: "brainstorming-9b4f4.firebaseapp.com",
+            projectId: "brainstorming-9b4f4",
+            storageBucket: "brainstorming-9b4f4.appspot.com",
+            messagingSenderId: "621312233749",
+            appId: "1:621312233749:web:1ee583e5e59e381da4991c",
+            measurementId: "G-3S4GLWPQVQ"
+        };
+
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let app, db, auth;
+        let userId = 'anonymous';
+        let currentTeamId = 'public_default_team';
+        let unsubscribeBrainstorming = null;
+        let eventsController = null;
+        let isFirebaseEnabled = false;
+
+        // Utilidades PDF (usa los UMD incluidos en <head>)
+        const html2canvasGlobal = window.html2canvas;
+        const jsPDFGlobal = window.jspdf && window.jspdf.jsPDF ? window.jspdf.jsPDF : (window.jspdf && window.jspdf.default ? window.jspdf.default : null);
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const authStatusDiv = document.getElementById('authStatus');
+            const teamIdInput = document.getElementById('teamIdInput');
+            const setTeamIdBtn = document.getElementById('setTeamIdBtn');
+            const currentTeamIdDisplay = document.getElementById('currentTeamIdDisplay');
+            const teamIdSection = document.querySelector('.team-id-section');
+
+            // --- Generar PDF del tablero ---
+            async function downloadPDF(toolId, pdfTitle) {
+                try {
+                    if (!html2canvasGlobal || !jsPDFGlobal) {
+                        alert("No se encontraron las librerías necesarias para generar PDF.");
+                        return;
+                    }
+                    const container = document.getElementById('brainstorming');
+                    // Escala para mejorar resolución
+                    const canvas = await html2canvasGlobal(container, { scale: 2, useCORS: true, scrollY: -window.scrollY });
+                    const imgData = canvas.toDataURL('image/png');
+                    // A4 portrait medidas en mm
+                    const pdf = new jsPDFGlobal('p', 'mm', 'a4');
+                    const pageWidth = pdf.internal.pageSize.getWidth();
+                    const pageHeight = pdf.internal.pageSize.getHeight();
+
+                    // Calcular dimensiones manteniendo aspecto
+                    const imgWidthMm = pageWidth - 20; // margenes 10mm
+                    const pxToMm = imgWidthMm / canvas.width;
+                    const imgHeightMm = canvas.height * pxToMm;
+
+                    let y = 10;
+                    pdf.setFontSize(14);
+                    pdf.text(pdfTitle, pageWidth / 2, 12, { align: 'center' });
+
+                    if (imgHeightMm <= (pageHeight - 30)) {
+                        pdf.addImage(imgData, 'PNG', 10, y + 6, imgWidthMm, imgHeightMm);
+                    } else {
+                        // Si la imagen es más alta que la página, dividir en varias páginas
+                        const pageCanvas = document.createElement('canvas');
+                        const pageCtx = pageCanvas.getContext('2d');
+                        const sliceHeightPx = Math.floor(canvas.width * ((pageHeight - 30) / imgWidthMm));
+                        pageCanvas.width = canvas.width;
+                        pageCanvas.height = sliceHeightPx;
+
+                        let offsetY = 0;
+                        while (offsetY < canvas.height) {
+                            pageCtx.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
+                            pageCtx.drawImage(canvas, 0, offsetY, canvas.width, sliceHeightPx, 0, 0, pageCanvas.width, pageCanvas.height);
+                            const pageData = pageCanvas.toDataURL('image/png');
+                            if (offsetY === 0) {
+                                pdf.addImage(pageData, 'PNG', 10, y + 6, imgWidthMm, (sliceHeightPx * pxToMm));
+                            } else {
+                                pdf.addPage();
+                                pdf.addImage(pageData, 'PNG', 10, 10, imgWidthMm, (sliceHeightPx * pxToMm));
+                            }
+                            offsetY += sliceHeightPx;
+                        }
+                    }
+
+                    pdf.save(`${pdfTitle.replace(/\s+/g,'_')}.pdf`);
+                } catch (e) {
+                    console.error("PDF generation error:", e);
+                    alert("Error al generar PDF. Revisa la consola para más detalles.");
+                }
+            }
+
+            // --- Inicializar Firebase ---
+            if (firebaseConfig && firebaseConfig.projectId) {
+                isFirebaseEnabled = true;
+                try {
+                    app = initializeApp(firebaseConfig);
+                    db = getFirestore(app);
+                    auth = getAuth(app);
+
+                    if (initialAuthToken) {
+                        try {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } catch (error) {
+                            console.warn("signInWithCustomToken failed:", error);
+                            await signInAnonymously(auth);
+                        }
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+
+                    onAuthStateChanged(auth, (user) => {
+                        if (user) {
+                            userId = user.uid;
+                            console.log("Auth success uid=", userId);
+                            authStatusDiv.innerHTML = `Conectado como: <span class="font-semibold text-indigo-700">${userId}</span>`;
+                            initializeBrainstorming();
+                        } else {
+                            userId = 'anonymous';
+                            authStatusDiv.innerHTML = `No conectado. <span class="spinner"></span>`;
+                        }
+                    });
+                } catch (error) {
+                    console.error("Firebase init error (detallado):", error, error.code, error.message);
+                    isFirebaseEnabled = false;
+                }
+            }
+
+            if (!isFirebaseEnabled) {
+                authStatusDiv.innerHTML = `<span class="font-semibold text-red-600">Modo sin conexión. La colaboración está deshabilitada.</span>`;
+                teamIdSection.style.display = 'none';
+                currentTeamIdDisplay.style.display = 'none';
+                initializeBrainstorming();
+            }
+
+            // --- Manejo ID equipo ---
+            teamIdInput.value = currentTeamId;
+            setTeamIdBtn.addEventListener('click', () => {
+                const newTeamId = teamIdInput.value.trim();
+                if (newTeamId && newTeamId !== currentTeamId) {
+                    currentTeamId = newTeamId;
+                    currentTeamIdDisplay.innerHTML = `Equipo actual: <span class="font-semibold text-purple-700">${currentTeamId}</span>`;
+                    initializeBrainstorming();
+                }
+            });
+
+            // --- Inicialización y control de listeners ---
+            function initializeBrainstorming() {
+                if (unsubscribeBrainstorming) {
+                    try { unsubscribeBrainstorming(); } catch(e){ console.warn("unsubscribe error:", e); }
+                }
+                if (eventsController) {
+                    try { eventsController.abort(); } catch(e){ console.warn("abort controller error:", e); }
+                }
+                eventsController = new AbortController();
+                setupBrainstorming();
+            }
+
+            function setupBrainstorming() {
+                const addNoteBtn = document.getElementById('addNoteBtn');
+                const notesContainer = document.getElementById('notesContainer');
+                const colorSwatches = document.querySelectorAll('.color-swatch');
+                const brainstormingCaseUse = document.getElementById('brainstormingCaseUse');
+                const clearBrainstormingBtn = document.getElementById('clearBrainstormingBtn');
+                const downloadBrainstormingPdfBtn = document.getElementById('downloadBrainstormingPdfBtn');
+
+                const passwordModal = document.getElementById('passwordModal');
+                const passwordInput = document.getElementById('passwordInput');
+                const passwordError = document.getElementById('passwordError');
+                const confirmClearBtn = document.getElementById('confirmClearBtn');
+                const cancelClearBtn = document.getElementById('cancelClearBtn');
+
+                const { signal } = eventsController;
+                let currentColor = 'yellow';
+                let debounceTimeout;
+
+                if (isFirebaseEnabled) {
+                    const brainstormingDocRef = doc(db, 'brainstorming_sessions', currentTeamId);
+
+                    try {
+                        unsubscribeBrainstorming = onSnapshot(brainstormingDocRef, (docSnap) => {
+                            if (docSnap.exists()) {
+                                const data = docSnap.data();
+                                brainstormingCaseUse.value = data.caseUse || '';
+                                renderNotes(data.notes || []);
+                            } else {
+                                renderNotes([]);
+                                brainstormingCaseUse.value = '';
+                            }
+                        }, (error) => {
+                            console.error("Snapshot listener error (detalles):", error, error.code, error.message);
+                            document.getElementById('authStatus').innerHTML = `<span class="font-semibold text-red-600">Modo sin conexión. No se pueden sincronizar los datos.</span>`;
+                        });
+                    } catch (e) {
+                        console.error("onSnapshot threw:", e);
+                    }
+                }
+
+                function renderNotes(notes) {
+                    const existingNoteElements = new Map();
+                    notesContainer.querySelectorAll('.sticky-note').forEach(noteDiv => {
+                        existingNoteElements.set(noteDiv.dataset.noteId, noteDiv);
+                    });
+
+                    notes.forEach(note => {
+                        let noteDiv = existingNoteElements.get(note.id);
+                        if (noteDiv) {
+                            const textarea = noteDiv.querySelector('textarea');
+                            if (textarea.value !== note.content) textarea.value = note.content;
+                            // actualizar color
+                            const currentColors = Array.from(noteDiv.classList).filter(cls => ['yellow','blue','green','pink'].includes(cls));
+                            if (!currentColors.includes(note.color)) {
+                                currentColors.forEach(c => noteDiv.classList.remove(c));
+                                noteDiv.classList.add(note.color);
+                            }
+                            existingNoteElements.delete(note.id);
+                        } else {
+                            createStickyNote(note.content, note.color, note.id, false);
+                        }
+                    });
+
+                    existingNoteElements.forEach(noteDiv => noteDiv.remove());
+                }
+
+                function createStickyNote(content = '', color = currentColor, id = (crypto && crypto.randomUUID ? crypto.randomUUID() : ('id_' + Date.now())), save = true) {
+                    const noteDiv = document.createElement('div');
+                    noteDiv.classList.add('sticky-note', color);
+                    noteDiv.dataset.noteId = id;
+
+                    const textarea = document.createElement('textarea');
+                    textarea.placeholder = 'Escribe tu idea aquí...';
+                    textarea.value = content;
+                    textarea.addEventListener('input', () => {
+                        clearTimeout(debounceTimeout);
+                        debounceTimeout = setTimeout(saveBrainstormingNotes, 500);
+                    });
+
+                    const deleteButton = document.createElement('button');
+                    deleteButton.classList.add('delete-button');
+                    deleteButton.innerHTML = '&times;';
+                    deleteButton.addEventListener('click', () => {
+                        noteDiv.remove();
+                        saveBrainstormingNotes();
+                    });
+
+                    noteDiv.appendChild(textarea);
+                    noteDiv.appendChild(deleteButton);
+                    notesContainer.appendChild(noteDiv);
+
+                    if (save) {
+                        saveBrainstormingNotes();
+                        textarea.focus();
+                    }
+                }
+
+                async function saveBrainstormingNotes() {
+                    if (!isFirebaseEnabled) return;
+                    const currentNotes = [];
+                    notesContainer.querySelectorAll('.sticky-note').forEach(noteDiv => {
+                        currentNotes.push({
+                            id: noteDiv.dataset.noteId,
+                            content: noteDiv.querySelector('textarea').value,
+                            color: Array.from(noteDiv.classList).find(cls => ['yellow','blue','green','pink'].includes(cls)) || 'yellow'
+                        });
+                    });
+
+                    try {
+                        const brainstormingDocRef = doc(db, 'brainstorming_sessions', currentTeamId);
+                        await setDoc(brainstormingDocRef, {
+                            caseUse: brainstormingCaseUse.value,
+                            notes: currentNotes,
+                            lastUpdatedBy: userId,
+                            timestamp: serverTimestamp()
+                        }, { merge: true });
+                    } catch (error) {
+                        console.error("Failed to save notes (detalles):", error, error.code, error.message);
+                    }
+                }
+
+                colorSwatches.forEach(swatch => {
+                    swatch.addEventListener('click', () => {
+                        colorSwatches.forEach(s => s.classList.remove('selected'));
+                        swatch.classList.add('selected');
+                        currentColor = swatch.dataset.color;
+                    }, { signal });
+                });
+
+                addNoteBtn.addEventListener('click', () => createStickyNote('', currentColor), { signal });
+
+                brainstormingCaseUse.addEventListener('input', () => {
+                    clearTimeout(debounceTimeout);
+                    debounceTimeout = setTimeout(saveBrainstormingNotes, 500);
+                }, { signal });
+
+                clearBrainstormingBtn.addEventListener('click', () => {
+                    passwordModal.style.display = 'flex';
+                    passwordInput.value = '';
+                    passwordError.style.display = 'none';
+                    passwordInput.focus();
+                }, { signal });
+
+                cancelClearBtn.addEventListener('click', () => {
+                    passwordModal.style.display = 'none';
+                }, { signal });
+
+                confirmClearBtn.addEventListener('click', async () => {
+                    if (passwordInput.value === "Comfa2025") {
+                        brainstormingCaseUse.value = '';
+                        notesContainer.innerHTML = '';
+                        if (isFirebaseEnabled) {
+                            try {
+                                const brainstormingDocRef = doc(db, 'brainstorming_sessions', currentTeamId);
+                                await setDoc(brainstormingDocRef, {
+                                    caseUse: '',
+                                    notes: [],
+                                    lastUpdatedBy: userId,
+                                    timestamp: serverTimestamp()
+                                }, { merge: true });
+                            } catch (error) {
+                                console.error("Failed to clear notes on DB (detalles):", error, error.code, error.message);
+                            }
+                        }
+                        passwordModal.style.display = 'none';
+                    } else {
+                        passwordError.style.display = 'block';
+                    }
+                }, { signal });
+
+                downloadBrainstormingPdfBtn.addEventListener('click', () => downloadPDF('brainstorming', `Brainstorming - ${currentTeamId}`), { signal });
+            }
+        });
+    </script>
+</body>
+</html>
