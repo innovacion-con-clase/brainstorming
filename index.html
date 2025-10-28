@@ -1,0 +1,1206 @@
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://kit.fontawesome.com/a71c8411d9.js" crossorigin="anonymous"></script>
+<script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                fontFamily: {
+                    sans: ['Inter', 'sans-serif'],
+                },
+                colors: {
+                    'primary': '#4f46e5', // Indigo-600 (Énfasis)
+                    'secondary': '#06b6d4', // Cyan-500 (Impacto Alto)
+                    'danger': '#ef4444', // Red-500 (Evitar / Esfuerzo Alto)
+                    'warning': '#f59e0b', // Amber-500 (Relleno / Esfuerzo Bajo)
+                    'quickwin': '#10b981', // Emerald-500 (Quick Win)
+                    'major': '#3b82f6', // Blue-500 (Proyecto Mayor)
+                    'fillin': '#6b7280', // Gray-500 (Rellenos)
+                },
+                boxShadow: {
+                    '3xl': '0 35px 60px -15px rgba(0, 0, 0, 0.3)',
+                }
+            }
+        }
+    }
+</script>
+<style>
+    /* VARIABLES CSS - Uso para simplificar la gestión de colores de cuadrante */
+    :root {
+        --color-quickwin: #10b981;
+        --color-major: #3b82f6;
+        --color-warning: #f59e0b;
+        --color-danger: #ef4444;
+        --color-primary: #4f46e5;
+    }
+    
+    /* Estilos para el estado activo del botón de calificación (Más sutil y elegante) */
+    .rating-btn.active-rating {
+        box-shadow: 0 0 0 3px var(--tw-colors-primary), 0 0 0 6px rgba(79, 70, 229, 0.3);
+        transform: scale(1.1);
+    }
+    
+    /* Efecto hover general para botones */
+    .btn-hover-shadow:hover {
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        transform: translateY(-1px);
+    }
+
+    /* Estilos de Pestañas Destacadas - Estilo más limpio y moderno */
+    .tab-button {
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        border-bottom: 4px solid transparent;
+        border-radius: 12px 12px 0 0;
+        margin-right: 4px;
+        padding: 12px 20px;
+        font-size: 1.125rem;
+        font-weight: 500;
+        color: #6b7280; /* Gray-500 */
+    }
+
+    .tab-button.active {
+        background-color: white;
+        color: var(--color-primary);
+        font-weight: 700;
+        border-bottom: 4px solid var(--color-primary);
+        box-shadow: 0 -8px 15px -3px rgba(0, 0, 0, 0.05), 0 -4px 6px -4px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Estilos para el modal */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.6);
+        display: none; /* Inicialmente oculto */
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        backdrop-filter: blur(8px); /* Blur más fuerte para un look premium */
+    }
+    
+    .modal-content {
+        transform: scale(0.95);
+        opacity: 0;
+        transition: all 0.3s ease-out;
+    }
+
+    .modal-overlay.flex .modal-content {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    /* Estilos para los bordes de fila basados en la categoría */
+    .quick-win-row { border-left: 6px solid var(--color-quickwin); }
+    .major-project-row { border-left: 6px solid var(--color-major); }
+    .fillin-row { border-left: 6px solid var(--color-warning); }
+    .hard-project-row { border-left: 6px solid var(--color-danger); }
+    
+    /* Estilo para el contenedor del canvas */
+    #chart-container {
+        width: 100%;
+        max-width: 800px; /* Aumentamos ligeramente el tamaño máximo para desktop */
+        margin: 0 auto;
+        aspect-ratio: 1 / 1; /* Mantiene la relación de aspecto 1:1 */
+    }
+    
+    /* Tooltip personalizado para el gráfico */
+    #chart-tooltip {
+        position: absolute;
+        pointer-events: none;
+        background: rgba(43, 41, 137, 0.95); /* Color oscuro para contraste */
+        color: white;
+        padding: 10px 15px;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        z-index: 100;
+        opacity: 0;
+        transition: opacity 0.15s ease-out;
+        transform: translate(-50%, -100%); /* Posicionar encima del cursor */
+        min-width: 180px;
+    }
+    
+    #chart-tooltip.visible {
+        opacity: 1;
+    }
+
+    /* Estilos de tabla responsiva */
+    @media (max-width: 768px) {
+        .responsive-table table {
+            display: block;
+            width: 100%;
+            border-spacing: 0;
+        }
+        .responsive-table thead, .responsive-table th {
+            display: none;
+        }
+        .responsive-table tbody, .responsive-table tr, .responsive-table td {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .responsive-table tr {
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+        }
+        .responsive-table td {
+            padding: 10px 16px;
+            text-align: right;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .responsive-table td:before {
+            content: attr(data-label);
+            float: left;
+            font-weight: bold;
+            color: #4b5563; /* Gray-600 */
+        }
+        /* Ocultar las columnas que ya son visibles en móvil con otro formato */
+        .responsive-table td:nth-child(1), 
+        .responsive-table td:nth-child(5) { 
+            display: table-cell; 
+            text-align: left;
+        }
+        .tab-button {
+             font-size: 1rem;
+        }
+        .tab-button.active {
+            box-shadow: 0 -4px 10px -2px rgba(0, 0, 0, 0.1);
+        }
+    }
+</style>
+
+<div id="loading-bar" class="loading-bar"></div>
+
+<div class="bg-gray-50 font-sans p-4 md:p-8 min-h-screen">
+    <div class="max-w-7xl mx-auto bg-white shadow-3xl rounded-3xl p-6 md:p-12 border border-gray-100">
+
+        <!-- Encabezado con Diseño Elevado (TÍTULOS CENTRADOS) -->
+        <header class="mb-10 pb-4 border-b border-gray-200 text-center">
+            <h1 class="text-4xl lg:text-5xl font-extrabold text-primary mb-2 flex items-center justify-center">
+                <i class="fas fa-rocket mr-3 text-secondary text-4xl"></i>
+                Matriz Estratégica para Gestión de Proyectos Ágiles
+            </h1>
+            <p class="text-xl text-gray-700 font-light italic mb-1">Transformación Empresarial Digital (TED)</p>
+            <p class="text-lg text-gray-700 font-semibold">Comfamiliar Risaralda</p>
+            <p id="user-info" class="text-sm mt-3 text-gray-500 font-medium"></p>
+        </header>
+
+        <!-- Controles de Pestañas (NOMBRES ACTUALIZADOS) -->
+        <div id="tab-controls" class="flex border-b border-gray-300 -mx-4 md:mx-0">
+            <button class="tab-button active flex items-center" data-tab="calificacion">
+                <i class="fas fa-edit mr-2 text-primary"></i>
+                1. Calificación
+            </button>
+            <button class="tab-button flex items-center" data-tab="matriz">
+                <i class="fas fa-chart-area mr-2 text-primary"></i>
+                2. Priorización
+            </button>
+        </div>
+
+        <!-- VISTA DE CALIFICACIÓN (Input) -->
+        <div id="calificacion-view" class="tab-content pt-8">
+            <h2 class="text-3xl font-extrabold text-gray-800 mb-6 border-l-4 border-primary pl-4">Calificar Impacto y Esfuerzo</h2>
+
+            <!-- Sección de Nombre del Participante -->
+            <div class="mb-8 p-5 bg-primary/5 rounded-2xl border border-primary/20 flex flex-col md:flex-row items-center space-y-3 md:space-y-0 md:space-x-6 shadow-lg">
+                <div class="flex-shrink-0 text-primary font-bold text-lg flex items-center">
+                    <i class="fas fa-user-tag mr-2 text-2xl"></i> Tu Nombre/Alias: <span class="text-danger text-xl ml-1">*</span>
+                </div>
+                <!-- AGREGADO: atributo required y clase para resaltar -->
+                <input type="text" id="user-name-input" placeholder="Ej. Wilson Orozco (¡Obligatorio!)" required class="flex-grow p-3 border-2 border-gray-300 rounded-xl shadow-inner focus:border-primary focus:ring focus:ring-primary/30 transition duration-150 text-gray-800">
+            </div>
+            
+            <!-- MENSAJE DE ADVERTENCIA -->
+            <div id="name-warning" class="hidden mb-6 p-4 bg-danger/10 text-danger border-l-4 border-danger rounded-lg font-semibold flex items-center shadow-md">
+                <i class="fas fa-exclamation-triangle mr-3"></i>
+                Por favor, ingresa tu Nombre/Alias en el campo superior antes de realizar cualquier calificación.
+            </div>
+
+            <!-- Sección de Criterios (Diseño Elevado) -->
+            <section class="mb-10 p-5 bg-white rounded-2xl border border-gray-200 shadow-md">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center"><i class="fas fa-sliders-h mr-2 text-secondary"></i> Criterios de Puntuación (Escala 1 a 5)</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-gray-700">
+                    <div class="p-3 border-l-4 border-secondary bg-secondary/5 rounded-lg">
+                        <p><span class="font-extrabold text-secondary">Impacto (I):</span> 5 (Muy Alto - Transformador) → 1 (Muy Bajo).</p>
+                    </div>
+                    <div class="p-3 border-l-4 border-warning bg-warning/5 rounded-lg">
+                        <p><span class="font-extrabold text-warning">Esfuerzo (E):</span> 5 (Muy Bajo - Fácil) → 1 (Muy Alto - Complejo).</p>
+                    </div>
+                    <div class="p-3 border-l-4 border-primary bg-primary/5 rounded-lg md:col-span-1">
+                        <p class="text-sm italic font-medium">El esfuerzo se califica de forma **INVERSA** para que un puntaje alto (I+E) sea siempre Quick Win (Q-W).</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tabla de Calificación -->
+            <div class="responsive-table">
+                <table class="min-w-full divide-y divide-gray-200 shadow-xl rounded-2xl overflow-hidden">
+                    <thead class="bg-primary/10">
+                        <tr>
+                            <th scope="col" class="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider hidden lg:table-cell">Pilar Estratégico</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Iniciativa / Descripción</th>
+                            <th scope="col" class="px-4 py-4 text-center text-xs font-bold text-secondary uppercase tracking-wider w-36">I (Alto)</th>
+                            <th scope="col" class="px-4 py-4 text-center text-xs font-bold text-warning uppercase tracking-wider w-36">E (Bajo)</th>
+                            <th scope="col" class="px-4 py-4 text-center text-sm font-bold text-primary uppercase tracking-wider w-20">Q-W (I+E)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="calificacion-table-body" class="bg-white divide-y divide-gray-100">
+                        <!-- Las filas de CALIFICACIÓN se insertarán aquí por JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- VISTA DE MATRIZ Y PRIORIZACIÓN (Output) -->
+        <div id="matriz-view" class="hidden tab-content pt-8">
+            <h2 class="text-3xl font-extrabold text-gray-800 mb-6 border-l-4 border-primary pl-4">Análisis Estratégico y Priorización</h2>
+
+            <!-- Contenedor para el botón de borrar y la lista de participantes -->
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                <!-- Resumen de Participantes -->
+                <div id="participants-list" class="p-4 bg-indigo-100 rounded-2xl text-base text-gray-800 border border-indigo-300 shadow-md w-full md:w-3/4">
+                    <!-- Se llenará con JavaScript -->
+                </div>
+
+                <!-- Botón de Reiniciar Datos (SOLUCIÓN IMPLEMENTADA) -->
+                <button 
+                    onclick="deleteAllRatings()"
+                    class="px-4 py-3 bg-danger text-white font-bold rounded-xl shadow-lg hover:bg-danger/90 transition btn-hover-shadow flex items-center justify-center w-full md:w-auto text-sm flex-shrink-0"
+                    title="Borrar todas las calificaciones de todos los usuarios (Requiere Contraseña: Comfa2025)">
+                    <i class="fas fa-trash-alt mr-2"></i>
+                    Reiniciar Datos del Equipo
+                </button>
+            </div>
+
+
+            <!-- Cuadrantes de Priorización (Contenedor Responsivo) -->
+            <div id="chart-container" class="mb-10 p-4 border-4 border-gray-300/50 rounded-2xl shadow-inner relative bg-white flex justify-center items-center">
+                <canvas id="quadrant-chart" class="w-full h-full"></canvas>
+                <div id="chart-tooltip" class="rounded-xl p-3 shadow-2xl"></div>
+
+                <!-- Leyenda superpuesta para móvil (NUEVOS NOMBRES) -->
+                <div class="absolute bottom-4 left-4 right-4 p-4 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg text-sm md:hidden border border-gray-200">
+                    <div class="font-bold mb-1 text-gray-800">Cuadrantes:</div>
+                    <div class="grid grid-cols-2 gap-2 text-gray-700">
+                        <span class="font-semibold flex items-center"><div class="w-2 h-2 rounded-full mr-2" style="background-color: var(--color-quickwin)"></div>Hacer Ya (Quick Win)</span>
+                        <span class="font-semibold flex items-center"><div class="w-2 h-2 rounded-full mr-2" style="background-color: var(--color-major)"></div>Ruta Crítica (Gran Proyecto)</span>
+                        <span class="font-semibold flex items-center"><div class="w-2 h-2 rounded-full mr-2" style="background-color: var(--color-warning)"></div>Fácil y Complementario (Fill-in)</span>
+                        <span class="font-semibold flex items-center"><div class="w-2 h-2 rounded-full mr-2" style="background-color: var(--color-danger)"></div>Re-evaluar o Descartar</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabla de Resultados Priorizados (NUEVOS NOMBRES EN COLUMNA CATEGORÍA) -->
+            <h3 class="text-2xl font-extrabold text-gray-800 mb-4 mt-8 flex items-center border-l-4 border-primary pl-4"><i class="fas fa-sort-amount-down-alt mr-2 text-secondary"></i> Proyectos Priorizados por Q-W Promedio</h3>
+            <div class="responsive-table">
+                <table class="min-w-full divide-y divide-gray-200 shadow-xl rounded-2xl overflow-hidden">
+                    <thead class="bg-primary/10">
+                        <tr>
+                            <th scope="col" class="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider hidden lg:table-cell">Pilar</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Iniciativa</th>
+                            <th scope="col" class="px-4 py-4 text-center text-xs font-bold text-secondary uppercase tracking-wider w-20">I Promedio</th>
+                            <th scope="col" class="px-4 py-4 text-center text-xs font-bold text-warning uppercase tracking-wider w-20">E Promedio</th>
+                            <th scope="col" class="px-4 py-4 text-center text-xs font-bold text-primary uppercase tracking-wider w-20">Categoría</th>
+                            <th scope="col" class="px-4 py-4 text-center text-sm font-bold text-primary uppercase tracking-wider w-20">Q-W Prom.</th>
+                        </tr>
+                    </thead>
+                    <tbody id="matriz-table-body" class="bg-white divide-y divide-gray-100">
+                        <!-- Las filas de PRIORIZACIÓN se insertarán aquí por JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <!-- PIE DE PÁGINA AÑADIDO -->
+    <footer class="mt-8 text-center text-sm text-gray-500 font-medium">
+        Derechos reservados Comfamiliar Risaralda - Matriz de Priorización Quick Wins.
+    </footer>
+</div>
+
+<!-- Modal para la descripción de la iniciativa -->
+<div id="project-modal" class="modal-overlay">
+    <div class="bg-white rounded-2xl shadow-3xl p-6 md:p-8 max-w-lg w-11/12 modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="flex justify-between items-start border-b pb-3 mb-4">
+            <h3 id="modal-title" class="text-2xl font-bold text-primary"></h3>
+            <button onclick="closeProjectDetails()" class="text-gray-400 hover:text-gray-700 transition transform hover:scale-110">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <div id="modal-description" class="text-gray-700 overflow-y-auto max-h-96 text-lg">
+            <!-- El contenido se inyectará aquí -->
+        </div>
+        <div class="mt-6 flex justify-end">
+            <button onclick="closeProjectDetails()" class="px-6 py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 transition shadow-lg btn-hover-shadow">
+                Cerrar
+            </button>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    // --- FIREBASE IMPORTS ---
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    // Nota: Agregamos getDocs, query y deleteDoc para la función de borrado
+    import { getFirestore, doc, setDoc, onSnapshot, collection, query, getDocs, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // --- GLOBAL VARS (Provided by Canvas) ---
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    
+    // SOLUCIÓN CRÍTICA: Inyección directa de la configuración de Firebase proporcionada por el usuario
+    const firebaseConfig = {
+        apiKey: "AIzaSyDHwfW34VdXbn3I2HTXOKvN4FgSm-CBWXc",
+        authDomain: "quik-win.firebaseapp.com",
+        projectId: "quik-win",
+        storageBucket: "quik-win.firebasestorage.app",
+        messagingSenderId: "994532208963",
+        appId: "1:994532208963:web:64bf2d6fc7db41b14e3ff6",
+        measurementId: "G-H0NVR04E5Y"
+    };
+    
+    // El token de autenticación sigue siendo inyectado por el entorno
+    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+    // --- FIREBASE INSTANCES ---
+    let app, db, auth;
+    let userId = null;
+    let userName = null;
+    let allTeamRatings = [];
+    
+    // CONSTANTE DE SEGURIDAD
+    const ADMIN_PASSWORD = "Comfa2025";
+    const RATINGS_COLLECTION_PATH = `artifacts/${appId}/public/data/comfamiliar_prioritization_ratings`;
+
+
+    // --- STATIC DATA ---
+    const staticProjects = [
+        { id: 1, name: "Chatbot de Salud Emocional (Ayúdate)", pillar: "IA y Automatización", impact: 3, effort: 3, description: "Herramienta interna para colaboradores que ofrece pautas guiadas de autorregulación y notifica a profesionales en casos graves. Potencial de extensión a afiliados. (Fuente: Iniciativas de Salud Emocional)" },
+        { id: 2, name: "Atención Front Desk Automatizada", pillar: "IA y Automatización", impact: 3, effort: 3, description: "Recepcionista virtual (similar a 'Sam') con pantalla y micrófono en centros físicos. Responde a preguntas frecuentes y gestiona procesos básicos (actualización de datos). (Fuente: Transformación del Espacio Físico)" },
+        { id: 3, name: "Motor de Sugerencias con IA", pillar: "Digital Centralizado", impact: 3, effort: 3, description: "Analizar consumo y perfilar proactivamente servicios sugeridos (venta cruzada). Inicia en Tienda de Servicios/Crédito Digital. (Fuente: Propuestas Digitales y Uso de IA)" },
+        { id: 4, name: "Integración con APIs Externas (Registraduría)", pillar: "Calidad del Dato", impact: 3, effort: 3, description: "Usar la Registraduría y otras APIs gubernamentales para validar la calidad del dato de identificación en el enrolamiento. (Fuente: Calidad y Estandarización de Datos)" },
+        { id: 5, name: "Normalización y Mantenimiento de Datos", pillar: "Calidad del Dato", impact: 3, effort: 3, description: "Alta prioridad a la corrección de datos de contacto (email, teléfono). Estandarización de direcciones con componentes de geolocalización (latitud/longitud). (Fuente: Calidad y Estandarización de Datos)" },
+        { id: 6, name: "Acceso Contactless (Cédula central)", pillar: "Experiencia 'Phygital'", impact: 3, effort: 3, description: "La Cédula de Ciudadanía como elemento central de acceso, identificación y pago en parques y servicios internos (sin tickets ni efectivo). (Fuente: Acceso a Servicios sin Contacto)" },
+        { id: 7, name: "Protocolos de Enrolamiento (Ampliar IDs)", pillar: "Calidad del Dato", impact: 3, effort: 3, description: "Ampliar los tipos de identificación aceptados (incluir Tarjeta de Identidad - TI) para mejorar la inclusión de usuarios jóvenes. (Fuente: Calidad y Estandarización de Datos)" },
+        { id: 8, name: "Centralización y Autenticación", pillar: "Calidad del Dato", impact: 3, effort: 3, description: "Resolver problemas internos de accesos múltiples y garantizar que el dato que ingresa al sistema sea limpio y único. (Fuente: Calidad y Estandarización de Datos)" },
+        { id: 9, name: "Agentes Autónomos con IA", pillar: "IA y Automatización", impact: 3, effort: 3, description: "Uso de APIs (ej. OpenAI) para implementar agentes que automaticen tareas repetitivas de alto volumen, reduciendo la carga operativa manual. (Fuente: Propuestas Digitales y Uso de IA)" },
+        { id: 10, name: "Recorridos Virtuales y Compra Inmediata", pillar: "Experiencia 'Phygital'", impact: 3, effort: 3, description: "Experiencia virtual (App/Punto Físico) de servicios (vivienda, turismo). Lo crucial: permite la compra directa sin desplazarse. (Fuente: Transformación del Espacio Físico)" },
+        { id: 11, name: "Punto Físico Interactivo", pillar: "Experiencia 'Phygital'", impact: 3, effort: 3, description: "Habilitar un espacio experiencial (Edificio El Obrero) con tecnología VR y pantallas para explorar todos los servicios de la caja. (Fuente: Transformación del Espacio Físico)" },
+        { id: 12, name: "Aplicación Móvil Centralizada (App)", pillar: "Digital Centralizado", impact: 3, effort: 3, description: "Universo único de servicios: Transacciones, certificados y acceso a toda la oferta (turismo, crédito) desde el móvil. Benchmarking: Confama. (Fuente: Propuestas Digitales y Uso de IA)" },
+    ];
+    let userProjects = [...staticProjects]; // Copia local para el usuario
+
+    // --- CONSTANTES DE DISEÑO ---
+    const COLORS = {
+        'Hacer Ya (Quick Win)': 'var(--color-quickwin)',
+        'Ruta Crítica (Gran Proyecto)': 'var(--color-major)',
+        'Fácil y Complementario (Fill-in)': 'var(--color-warning)',
+        'Re-evaluar o Descartar': 'var(--color-danger)',
+        'Sin Categoría': 'var(--color-fillin)',
+    };
+    let currentTab = 'calificacion'; // Inicializar la pestaña actual
+    let currentAveragedProjects = []; // Almacena los proyectos promediados
+    
+    // --- HELPERS ---
+    function showLoadingBar() { document.getElementById('loading-bar').classList.add('active'); }
+    function hideLoadingBar() { document.getElementById('loading-bar').classList.remove('active'); }
+    
+    /** Muestra el mensaje de advertencia del nombre */
+    function showNameWarning() {
+        document.getElementById('name-warning').classList.remove('hidden');
+    }
+
+    /** Oculta el mensaje de advertencia del nombre */
+    function hideNameWarning() {
+        document.getElementById('name-warning').classList.add('hidden');
+    }
+
+
+    // --- FIREBASE AUTH & INIT ---
+    async function setupFirebase() {
+        try {
+            // Con esta inyección directa, ya no debería haber errores de configuración faltante
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+
+            // Forzamos el inicio de sesión anónimo, eliminando la dependencia del initialAuthToken
+            // que es la causa más probable de los 403 en entornos embebidos.
+            await signInAnonymously(auth);
+
+            // [DEBUG] Esto nos confirmará si la autenticación fue exitosa
+            if (auth.currentUser) {
+                console.log(`[FIREBASE STATUS] Conexión Exitosa. User ID: ${auth.currentUser.uid}. Iniciando listeners.`);
+            } else {
+                console.error("[FIREBASE STATUS] Conexión establecida, pero la autenticación falló. Revisar reglas o token.");
+            }
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    userId = user.uid;
+                    listenForUserRatings();
+                    listenForTeamRatings();
+                    updatePrioritization();
+                } else {
+                    console.log("No user is signed in.");
+                    userId = null;
+                }
+            });
+
+        } catch (e) {
+            console.error("Error FATAL en setupFirebase (Probablemente conexión o autenticación):", e);
+        }
+    }
+
+    // --- FIREBASE LISTENERS ---
+    function listenForUserRatings() {
+        if (!userId || !db) return;
+        const userDocRef = doc(db, RATINGS_COLLECTION_PATH, userId);
+
+        onSnapshot(userDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const userData = docSnap.data();
+                userName = userData.name || `Usuario (${userId.substring(0, 4)}...)`;
+                
+                document.getElementById('user-name-input').value = userData.name || '';
+                document.getElementById('user-info').innerHTML = `Autenticado como: <strong>${userName}</strong> (ID: ${userId})`;
+                
+                // Ocultar la advertencia si el usuario ya tiene un nombre guardado
+                if (userData.name && userData.name.trim() !== '') {
+                    hideNameWarning(); 
+                }
+
+                if (userData.ratings && Array.isArray(userData.ratings)) {
+                    userData.ratings.forEach(savedRating => {
+                        const project = userProjects.find(p => p.id === savedRating.id);
+                        if (project) {
+                            project.impact = savedRating.impact;
+                            project.effort = savedRating.effort;
+                        }
+                    });
+                    updatePrioritization();
+                }
+            } else {
+                document.getElementById('user-info').innerHTML = `Autenticado como: <strong>Usuario Nuevo</strong> (ID: ${userId})`;
+                // Mantener la advertencia visible para nuevos usuarios
+            }
+        });
+    }
+
+    function listenForTeamRatings() {
+        if (!db) return;
+        const teamCollectionRef = collection(db, RATINGS_COLLECTION_PATH);
+
+        onSnapshot(teamCollectionRef, (snapshot) => {
+            allTeamRatings = [];
+            let participantNames = [];
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                // Solo incluimos documentos que tengan ratings y un nombre para el listado de participantes
+                if (data.ratings && Array.isArray(data.ratings) && data.ratings.length > 0) {
+                    allTeamRatings.push({
+                        userId: doc.id,
+                        name: data.name || `Usuario (${doc.id.substring(0, 4)}...)`,
+                        ratings: data.ratings
+                    });
+                    
+                    if (data.name) {
+                       participantNames.push(data.name);
+                    } else {
+                       participantNames.push(`Usuario (${doc.id.substring(0, 4)}...)`);
+                    }
+                }
+            });
+
+            // Actualizar la lista de participantes
+            const uniqueNames = [...new Set(participantNames)];
+            
+            // Uso de <span> y <strong> para un renderizado HTML correcto
+            document.getElementById('participants-list').innerHTML = `
+                <i class="fas fa-users mr-2 text-indigo-800"></i> <strong>${uniqueNames.length}</strong> Participantes que han Calificado: 
+                <span class="font-normal">${uniqueNames.join(', ') || 'Ninguno aún.'}</span>
+            `;
+
+            updatePrioritization(); // Forzar el recalculo de la matriz con los nuevos votos
+        }, (error) => {
+            console.error("Error al escuchar calificaciones del equipo:", error);
+        });
+    }
+
+    // --- FIREBASE WRITERS ---
+    async function saveUserRatings() {
+        if (!userId) {
+            console.error("No hay usuario autenticado para guardar datos.");
+            return;
+        }
+        
+        const currentUserNameInput = document.getElementById('user-name-input');
+        const currentUserName = currentUserNameInput.value.trim();
+
+        if (!currentUserName) {
+            showNameWarning();
+            // No guardamos si el nombre está vacío
+            return; 
+        }
+        
+        hideNameWarning();
+        showLoadingBar();
+
+        try {
+            const userDocRef = doc(db, RATINGS_COLLECTION_PATH, userId);
+            
+            const ratingsToSave = userProjects.map(p => ({
+                id: p.id,
+                impact: p.impact,
+                effort: p.effort
+            }));
+
+            await setDoc(userDocRef, { 
+                name: currentUserName, // Guardamos el nombre actual del input
+                ratings: ratingsToSave
+            }, { merge: true }); 
+            
+            // Forzar actualización del display name si el usuario lo cambió
+            userName = currentUserName;
+            document.getElementById('user-info').innerHTML = `Autenticado como: <strong>${userName}</strong> (ID: ${userId})`;
+
+        } catch (e) {
+            console.error("Error guardando calificaciones:", e);
+        } finally {
+            hideLoadingBar();
+        }
+    }
+    
+    /** * Elimina todos los documentos (calificaciones) de la colección colaborativa.
+     * Requiere la contraseña 'Comfa2025'.
+     */
+    window.deleteAllRatings = async function() {
+        if (!db || !auth.currentUser) {
+            alert("Error: La aplicación no está autenticada o conectada a Firebase.");
+            return;
+        }
+
+        const password = prompt("ADVERTENCIA: Esta acción BORRARÁ TODAS las calificaciones de TODOS los participantes.\n\nIngrese la contraseña de administrador para continuar:");
+
+        if (password !== ADMIN_PASSWORD) {
+            alert("Contraseña incorrecta. La operación de borrado ha sido cancelada.");
+            return;
+        }
+        
+        showLoadingBar();
+        
+        try {
+            const batch = writeBatch(db);
+            const collectionRef = collection(db, RATINGS_COLLECTION_PATH);
+            const q = query(collectionRef);
+            
+            const querySnapshot = await getDocs(q);
+            let deletedCount = 0;
+
+            querySnapshot.forEach((doc) => {
+                batch.delete(doc.ref);
+                deletedCount++;
+            });
+
+            await batch.commit();
+            alert(`Éxito: Se han borrado ${deletedCount} calificaciones. La matriz se reiniciará en breve.\n\nNOTA: Si el borrado falló, es posible que el usuario anónimo no tenga el permiso 'delete' en las reglas de seguridad de Firebase. Consulte las reglas para ver la solución.`);
+            
+        } catch (e) {
+            console.error("Error borrando documentos:", e);
+            alert("Error al intentar borrar los datos. Revise los permisos de Firebase (Regla 'allow delete' requerida).");
+        } finally {
+            hideLoadingBar();
+        }
+    };
+
+
+    // --- LÓGICA DE PRIORIZACIÓN ---
+
+    function getQuadrant(impact, effort) {
+        // Umbrales basados en el promedio (3.0 es el centro, 3.5 es el umbral para "Alto")
+        const IMPACT_THRESHOLD = 3.5;
+        const EFFORT_THRESHOLD = 3.5; // Recuerda: 5 es BAJO esfuerzo (Fácil)
+        
+        const isHighImpact = impact >= IMPACT_THRESHOLD;
+        const isLowEffort = effort >= EFFORT_THRESHOLD; // Low Effort = High Score
+
+        // Mapeo a la nueva terminología orientada a la acción/ejecución
+        if (isHighImpact && isLowEffort) return 'Hacer Ya (Quick Win)'; // Alto Impacto, Fácil
+        if (isHighImpact && !isLowEffort) return 'Ruta Crítica (Gran Proyecto)'; // Alto Impacto, Difícil (requiere planificación estratégica)
+        if (!isHighImpact && isLowEffort) return 'Fácil y Complementario (Fill-in)'; // Bajo Impacto, Fácil (hacer solo si hay tiempo libre)
+        if (!isHighImpact && !isLowEffort) return 'Re-evaluar o Descartar'; // Bajo Impacto, Difícil (evitar)
+        return 'Sin Categoría';
+    }
+
+    function getRowClass(category) {
+        switch (category) {
+            case 'Hacer Ya (Quick Win)': return 'quick-win-row bg-quickwin/5 hover:bg-quickwin/10';
+            case 'Ruta Crítica (Gran Proyecto)': return 'major-project-row bg-major/5 hover:bg-major/10';
+            case 'Fácil y Complementario (Fill-in)': return 'fillin-row bg-warning/5 hover:bg-warning/10';
+            case 'Re-evaluar o Descartar': return 'hard-project-row bg-danger/5 hover:bg-danger/10';
+            default: return 'bg-white hover:bg-gray-100';
+        }
+    }
+
+    function calculateAverageRatings() {
+        const aggregatedData = {};
+
+        // 1. Inicializar con la data estática para evitar que se "borren"
+        staticProjects.forEach(staticP => {
+            aggregatedData[staticP.id] = { 
+                ...staticP,
+                totalImpact: 0, 
+                totalEffort: 0, 
+                count: 0 
+            };
+        });
+
+        // 2. Sumar todos los votos del equipo
+        allTeamRatings.forEach(teamRating => {
+            teamRating.ratings.forEach(rating => {
+                if (aggregatedData[rating.id]) {
+                    aggregatedData[rating.id].totalImpact += rating.impact;
+                    aggregatedData[rating.id].totalEffort += rating.effort;
+                    aggregatedData[rating.id].count += 1;
+                }
+            });
+        });
+
+        // 3. Calcular promedios y categorías
+        const averagedProjects = Object.values(aggregatedData).map(data => {
+            
+            // Asegurar que se usen los valores promedio si hay conteo de votos > 0.
+            const avgImpact = data.count > 0 ? data.totalImpact / data.count : data.impact; 
+            const avgEffort = data.count > 0 ? data.totalEffort / data.count : data.effort;
+
+            return {
+                id: data.id,
+                name: data.name,
+                pillar: data.pillar,
+                description: data.description,
+                impact: parseFloat(avgImpact.toFixed(2)),
+                effort: parseFloat(avgEffort.toFixed(2)),
+                quickWinScore: parseFloat((avgImpact + avgEffort).toFixed(2)),
+                quadrant: getQuadrant(avgImpact, avgEffort)
+            };
+        });
+
+        // Ordenar por Puntaje Quick-Win descendente
+        averagedProjects.sort((a, b) => b.quickWinScore - a.quickWinScore);
+        
+        currentAveragedProjects = averagedProjects; // Almacenar para el chart tooltip
+        return averagedProjects;
+    }
+
+    // --- RENDERING / DOM UPDATES ---
+
+    function handleRatingClick(event) {
+        const button = event.target.closest('[data-type][data-value]');
+        if (!button) return;
+        
+        const currentUserNameInput = document.getElementById('user-name-input');
+        if (!currentUserNameInput.value.trim()) {
+            showNameWarning();
+            // Enfocar el input para una mejor UX
+            currentUserNameInput.focus(); 
+            return;
+        }
+        
+        hideNameWarning();
+        
+        const projectId = parseInt(button.getAttribute('data-project-id'));
+        const type = button.getAttribute('data-type');
+        const newValue = parseInt(button.getAttribute('data-value'));
+
+        const project = userProjects.find(p => p.id === projectId);
+        if (project) {
+            project[type] = newValue;
+            updatePrioritization();
+            saveUserRatings(); // Guardar automáticamente al votar
+        }
+    }
+
+    function createRatingControl(projectId, type, currentValue, isEditable) {
+        if (!isEditable) {
+            // Retorna texto simple con decimales para la Matriz
+            return `<span class="font-bold text-lg">${currentValue.toFixed(2)}</span>`;
+        }
+
+        const container = document.createElement('div');
+        container.className = 'flex justify-center space-x-0.5';
+
+        const baseColorClass = (type === 'impact') ? 'secondary' : 'warning';
+        
+        for (let i = 1; i <= 5; i++) {
+            const button = document.createElement('span');
+            button.textContent = i;
+            button.className = `rating-btn cursor-pointer w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold transition duration-200 ease-in-out border-2 transform hover:scale-125`;
+            
+            if (i === currentValue) {
+                button.classList.add(`bg-${baseColorClass}`, `border-${baseColorClass}`, 'text-white', 'active-rating');
+            } else {
+                button.classList.add(`bg-white`, 'border-gray-300', `text-gray-500`, 'hover:bg-gray-200');
+            }
+
+            button.setAttribute('data-value', i);
+            button.setAttribute('data-project-id', projectId);
+            button.setAttribute('data-type', type);
+            container.appendChild(button);
+        }
+        return container;
+    }
+
+    function createRow(project, targetBody, isEditable) {
+        const row = document.createElement('tr');
+        const rowClasses = getRowClass(project.quadrant) + ' transition duration-200 rounded-xl shadow-sm border-2 border-transparent hover:border-gray-300';
+        row.className = rowClasses;
+
+        // Columna de Pilar (oculta en móvil)
+        const pillarCell = document.createElement('td');
+        pillarCell.className = 'px-4 py-4 text-sm text-gray-700 hidden lg:table-cell font-medium';
+        pillarCell.textContent = project.pillar;
+        row.appendChild(pillarCell);
+
+        // Columna de Iniciativa (incluye Pilar y Notas en móvil)
+        const nameCell = document.createElement('td');
+        nameCell.className = 'px-6 py-4 text-sm font-semibold text-gray-900 whitespace-normal';
+        nameCell.setAttribute('data-label', 'Iniciativa');
+
+        const mobilePillar = `<span class="text-xs font-semibold text-gray-500 lg:hidden block mb-1">${project.pillar}</span>`;
+        
+        let initiativeNameContent;
+        if (isEditable) {
+            initiativeNameContent = `
+                <div class="font-bold text-base flex items-center cursor-pointer group" 
+                     data-action="show-details" data-id="${project.id}">
+                    <span class="inline-block w-6 h-6 mr-2 rounded-full text-white text-sm text-center leading-6 bg-primary font-black">${project.id}</span>
+                    <span class="group-hover:text-secondary transition">${project.name}</span>
+                    <i class="fas fa-info-circle text-gray-400 text-xs ml-2 group-hover:text-secondary transition"></i>
+                </div>`;
+        } else {
+            initiativeNameContent = `
+                <div class="font-bold text-base flex items-center">
+                    <span class="inline-block w-6 h-6 mr-2 rounded-full text-white text-sm text-center leading-6 font-black" style="background-color: ${COLORS[project.quadrant]}">${project.id}</span>
+                    ${project.name}
+                </div>`;
+        }
+
+        nameCell.innerHTML = `${mobilePillar} ${initiativeNameContent}`;
+        row.appendChild(nameCell);
+
+        // Columna de Impacto (I)
+        const impactCell = document.createElement('td');
+        impactCell.className = 'px-4 py-4 text-center text-sm';
+        impactCell.setAttribute('data-label', isEditable ? 'Impacto (I)' : 'I Promedio');
+        const impactContent = createRatingControl(project.id, 'impact', project.impact, isEditable);
+        if (isEditable) {
+            impactCell.appendChild(impactContent);
+        } else {
+            impactCell.innerHTML = impactContent;
+        }
+        row.appendChild(impactCell);
+
+        // Columna de Esfuerzo (E)
+        const effortCell = document.createElement('td');
+        effortCell.className = 'px-4 py-4 text-center text-sm';
+        effortCell.setAttribute('data-label', isEditable ? 'Esfuerzo (E)' : 'E Promedio');
+        const effortContent = createRatingControl(project.id, 'effort', project.effort, isEditable);
+        if (isEditable) {
+            effortCell.appendChild(effortContent);
+        } else {
+            effortCell.innerHTML = effortContent;
+        }
+        row.appendChild(effortCell);
+
+        // Columna de Categoría (Solo en Matriz)
+        if (!isEditable) {
+            const categoryCell = document.createElement('td');
+            categoryCell.className = 'px-4 py-4 text-center text-sm font-extrabold';
+            categoryCell.setAttribute('data-label', 'Categoría');
+            categoryCell.textContent = project.quadrant;
+            categoryCell.style.color = COLORS[project.quadrant];
+            row.appendChild(categoryCell);
+        }
+
+        // Columna de Puntaje Quick-Win (Q-W)
+        const scoreCell = document.createElement('td');
+        scoreCell.className = 'px-4 py-4 text-center text-xl font-black';
+        scoreCell.setAttribute('data-label', isEditable ? 'Q-W (I+E)' : 'Q-W Prom.');
+        scoreCell.textContent = project.quickWinScore.toFixed(2);
+        
+        let scoreColor = 'text-gray-900';
+        if (project.quickWinScore >= 8.5) {
+            scoreColor = 'text-quickwin';
+        } else if (project.quickWinScore >= 6) {
+            scoreColor = 'text-major';
+        } else if (project.quickWinScore <= 4.5) {
+            scoreColor = 'text-danger';
+        }
+        scoreCell.classList.add(scoreColor);
+
+        if (isEditable) {
+            scoreCell.classList.remove('text-xl', 'font-black');
+            scoreCell.classList.add('text-lg', 'font-extrabold');
+        }
+
+        row.appendChild(scoreCell);
+        targetBody.appendChild(row);
+    }
+
+    function renderTables() {
+        const averagedProjects = calculateAverageRatings();
+
+        // 1. Renderizar la tabla de Calificación (Mi Voto - Editable)
+        const calificacionTableBody = document.getElementById('calificacion-table-body');
+        calificacionTableBody.innerHTML = '';
+        userProjects.forEach(project => {
+            project.quickWinScore = project.impact + project.effort;
+            project.quadrant = getQuadrant(project.impact, project.effort);
+            createRow(project, calificacionTableBody, true);
+        });
+
+        // 2. Renderizar la tabla de Matriz (Promedio del Equipo - No Editable)
+        const matrizTableBody = document.getElementById('matriz-table-body');
+        matrizTableBody.innerHTML = '';
+        averagedProjects.forEach(project => {
+            createRow(project, matrizTableBody, false);
+        });
+
+        // Si estamos en la pestaña Matriz, redibujar el gráfico
+        if (currentTab === 'matriz') {
+            drawQuadrantChart(averagedProjects);
+        }
+    }
+
+    function updatePrioritization() {
+        renderTables();
+    }
+
+    // --- FUNCIONES DE MODAL ---
+
+    function showProjectDetails(projectId) {
+        const project = staticProjects.find(p => p.id === projectId);
+        if (!project) return;
+
+        document.getElementById('modal-title').textContent = `${project.id}. ${project.name}`;
+        document.getElementById('modal-description').textContent = project.description;
+        document.getElementById('project-modal').classList.remove('hidden');
+        document.getElementById('project-modal').classList.add('flex');
+    }
+
+    window.closeProjectDetails = function() {
+        document.getElementById('project-modal').classList.add('hidden');
+        document.getElementById('project-modal').classList.remove('flex');
+    }
+
+    // --- FUNCIONES DE GRÁFICO (Canvas) ---
+
+    // Función para obtener la posición real del proyecto en el canvas
+    function getProjectPosition(p, size, margin, scaleFactor) {
+        const yOffset = p.impact * scaleFactor;
+        const xOffset = p.effort * scaleFactor;
+        
+        // El tamaño del punto
+        const pointRadius = 12;
+
+        // Jitter para evitar superposición
+        const jitterX = (p.id * 5) % 15 - 7.5; // Jitter pseudo-aleatorio basado en ID
+        const jitterY = (p.id * 7) % 15 - 7.5; 
+
+        const x = margin + xOffset + jitterX;
+        const y = size - margin - yOffset + jitterY; 
+
+        return { x, y, radius: pointRadius, id: p.id, name: p.name, quadrant: p.quadrant, quickWinScore: p.quickWinScore };
+    }
+
+
+    function drawQuadrantChart(data) {
+        if (currentTab !== 'matriz') return;
+
+        const canvas = document.getElementById('quadrant-chart');
+        const container = document.getElementById('chart-container');
+        
+        // Hacer el canvas responsivo al contenedor
+        const size = Math.min(container.clientWidth - 32, 800); 
+        canvas.width = size;
+        canvas.height = size;
+
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, size, size);
+        ctx.font = '14px Inter, sans-serif';
+
+        const margin = size * 0.08; // Margen dinámico basado en el tamaño
+        const chartSize = size - 2 * margin;
+        const scaleFactor = chartSize / 5; // Escala de 1 a 5
+
+        // Umbrales para líneas punteadas (Impacto/Esfuerzo 3.5)
+        const impactThresholdY = size - (margin + scaleFactor * 3.5);
+        const effortThresholdX = margin + scaleFactor * 3.5;
+
+        // --- 1. Dibujar Fondos de Cuadrantes (Gradientes Sutiles) ---
+        
+        // Función para crear gradientes
+        const createGradient = (x1, y1, x2, y2, color1, color2) => {
+            const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+            gradient.addColorStop(0, color1);
+            gradient.addColorStop(1, color2);
+            return gradient;
+        };
+        
+        // Colores de fondo sutiles
+        const QW_BG = createGradient(effortThresholdX, impactThresholdY, size - margin, margin, 'rgba(16, 185, 129, 0.1)', 'rgba(16, 185, 129, 0.03)');
+        const MA_BG = createGradient(margin, impactThresholdY, effortThresholdX, margin, 'rgba(59, 130, 246, 0.1)', 'rgba(59, 130, 246, 0.03)');
+        const R_BG = createGradient(effortThresholdX, size - margin, size - margin, impactThresholdY, 'rgba(245, 158, 11, 0.1)', 'rgba(245, 158, 11, 0.03)');
+        const E_BG = createGradient(margin, size - margin, effortThresholdX, impactThresholdY, 'rgba(239, 68, 68, 0.1)', 'rgba(239, 68, 68, 0.03)');
+
+        // Cuadrante Quick Wins (Arriba Derecha)
+        ctx.fillStyle = QW_BG;
+        ctx.fillRect(effortThresholdX, margin, size - margin - effortThresholdX, impactThresholdY - margin);
+
+        // Cuadrante Proyectos Mayores (Arriba Izquierda)
+        ctx.fillStyle = MA_BG;
+        ctx.fillRect(margin, margin, effortThresholdX - margin, impactThresholdY - margin);
+
+        // Cuadrante Rellenos (Abajo Derecha - Bajo Impacto, Bajo Esfuerzo)
+        ctx.fillStyle = R_BG;
+        ctx.fillRect(effortThresholdX, impactThresholdY, size - margin - effortThresholdX, size - margin - impactThresholdY);
+
+        // Cuadrante Evitar / Difícil (Abajo Izquierda)
+        ctx.fillStyle = E_BG;
+        ctx.fillRect(margin, impactThresholdY, effortThresholdX - margin, size - margin - impactThresholdY);
+
+        // --- 2. Dibujar el grid y Umbrales (Líneas Discontinuas) ---
+        ctx.strokeStyle = '#bdbdcc'; 
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 8]); // Patrón de línea punteada
+
+        // Línea Horizontal de Impacto (Y) en 3.5
+        ctx.beginPath();
+        ctx.moveTo(margin, impactThresholdY);
+        ctx.lineTo(size - margin, impactThresholdY);
+        ctx.stroke();
+
+        // Línea Vertical de Esfuerzo (X) en 3.5 (Bajo Esfuerzo)
+        ctx.beginPath();
+        ctx.moveTo(effortThresholdX, margin);
+        ctx.lineTo(effortThresholdX, size - margin);
+        ctx.stroke();
+
+        ctx.setLineDash([]); // Restablecer línea sólida
+
+        // --- 3. Dibujar Ejes Principales (Borde de la Matriz) ---
+        ctx.strokeStyle = '#374151'; // Gray-700
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        
+        ctx.beginPath();
+        ctx.moveTo(margin, size - margin);
+        ctx.lineTo(size - margin + 5, size - margin); // Eje X (Esfuerzo)
+        ctx.moveTo(margin, size - margin);
+        ctx.lineTo(margin, margin - 5); // Eje Y (Impacto)
+        ctx.stroke();
+
+        // --- 4. Dibujar Etiquetas de Ejes y Leyenda ---
+        ctx.fillStyle = '#1f2937';
+        ctx.textAlign = 'center';
+        ctx.font = `bold ${size * 0.03}px Inter, sans-serif`; 
+
+        // Etiquetas X (Esfuerzo)
+        ctx.fillText('Bajo Esfuerzo (Fácil)', size * 0.75, size - margin / 3);
+        ctx.fillText('Alto Esfuerzo (Complejo)', size * 0.25, size - margin / 3);
+        
+        // Etiquetas Y (Impacto - Rotadas)
+        ctx.save();
+        ctx.translate(margin / 3, size / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.textAlign = 'center';
+        ctx.fillText('Alto Impacto', 0, -chartSize / 2 + 20); 
+        ctx.fillText('Bajo Impacto', 0, chartSize / 2 - 20); 
+        ctx.restore();
+
+        // Etiquetas de Umbral (3.5)
+        ctx.font = `italic ${size * 0.025}px Inter, sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#4b5563';
+        ctx.fillText('Umbral Impacto (3.5)', margin - 10, impactThresholdY - 10);
+        ctx.textAlign = 'center';
+        ctx.fillText('Umbral Esfuerzo (3.5)', effortThresholdX, size - margin + 20);
+
+
+        // --- 5. Dibujar Proyectos Promediados y Almacenar Posiciones ---
+        window.projectPositions = []; // Almacenar para la interactividad
+        data.forEach(p => {
+            const pos = getProjectPosition(p, size, margin, scaleFactor);
+            window.projectPositions.push(pos);
+            const category = p.quadrant;
+
+            // Círculo del proyecto (Punto)
+            ctx.fillStyle = COLORS[category] || '#000000';
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, pos.radius, 0, Math.PI * 2, true);
+            ctx.fill();
+
+            // Borde del círculo (efecto de elevación)
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            // ID del proyecto dentro del círculo
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '14px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(p.id, pos.x, pos.y + 5);
+        });
+    }
+
+    // --- INTERACTIVIDAD DEL GRÁFICO (TOOLTIP) ---
+
+    let currentTooltip = null;
+
+    function handleChartMouseMove(event) {
+        const canvas = document.getElementById('quadrant-chart');
+        const rect = canvas.getBoundingClientRect();
+        
+        // Coordenadas relativas al canvas
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+
+        let closestProject = null;
+        const points = window.projectPositions || [];
+        
+        // Escalar las posiciones para coincidir con el tamaño actual del canvas en pantalla
+        const scale = canvas.width / rect.width;
+
+        for (const p of points) {
+            // Ajustar posición del punto al tamaño del DOM
+            const scaledX = p.x / scale;
+            const scaledY = p.y / scale;
+            const scaledR = p.radius / scale;
+
+            const distance = Math.sqrt(Math.pow(mouseX - scaledX, 2) + Math.pow(mouseY - scaledY, 2));
+
+            if (distance < scaledR + 5) { // 5px de tolerancia
+                closestProject = p;
+                break;
+            }
+        }
+
+        const tooltip = document.getElementById('chart-tooltip');
+        if (closestProject) {
+            if (currentTooltip !== closestProject.id) {
+                // Generar contenido del tooltip
+                tooltip.innerHTML = `
+                    <div class="font-bold text-lg mb-1" style="color: ${COLORS[closestProject.quadrant]}">${closestProject.name}</div>
+                    <div class="text-sm">Categoría: <span class="font-semibold">${closestProject.quadrant}</span></div>
+                    <div class="text-sm">Q-W Score: <span class="font-semibold">${closestProject.quickWinScore.toFixed(2)}</span></div>
+                `;
+                currentTooltip = closestProject.id;
+            }
+            
+            // Posicionar el tooltip (Usar la posición del cursor, no del punto)
+            tooltip.style.left = `${mouseX}px`;
+            tooltip.style.top = `${mouseY}px`;
+            tooltip.classList.add('visible');
+        } else {
+            tooltip.classList.remove('visible');
+            currentTooltip = null;
+        }
+    }
+
+
+    // --- SWITCH TABS ---
+
+    function switchTab(tabName) {
+        currentTab = tabName;
+
+        document.getElementById('calificacion-view').classList.add('hidden');
+        document.getElementById('matriz-view').classList.add('hidden');
+
+        document.getElementById(tabName + '-view').classList.remove('hidden');
+
+        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+        // Seleccionamos el botón activo usando el nuevo atributo data-tab
+        document.querySelector(`.tab-button[data-tab="${tabName}"]`).classList.add('active');
+
+        if (tabName === 'matriz') {
+            // Forzar el dibujo del canvas al entrar en la pestaña Matriz
+            drawQuadrantChart(currentAveragedProjects);
+        }
+    }
+
+    // --- INITIALIZATION ---
+
+    window.onload = async function() {
+        // Inicializar Firebase y oyentes
+        await setupFirebase();
+
+        // Renderizar inmediatamente con datos por defecto mientras Firebase carga
+        updatePrioritization(); 
+
+        // Inicializar la primera pestaña
+        switchTab('calificacion');
+
+        // Mostrar la advertencia de nombre si el campo está vacío
+        const userNameInput = document.getElementById('user-name-input');
+        if (!userNameInput.value.trim()) {
+            showNameWarning();
+        }
+
+        // NUEVO: Delegación de Eventos para el cambio de pestañas, 
+        // eliminando la dependencia del 'onclick' en el HTML.
+        const tabControls = document.getElementById('tab-controls');
+        if (tabControls) {
+            tabControls.addEventListener('click', (event) => {
+                const targetButton = event.target.closest('[data-tab]');
+                if (targetButton) {
+                    const tabName = targetButton.getAttribute('data-tab');
+                    if (tabName) {
+                        switchTab(tabName);
+                    }
+                }
+            });
+        }
+
+        // Delegación de Eventos para clics en la tabla de Calificación (Mi Voto)
+        document.getElementById('calificacion-table-body').addEventListener('click', (event) => {
+            const target = event.target.closest('.rating-btn');
+            if (target && target.getAttribute('data-type')) {
+                // LLama a la función que ahora incluye la validación del nombre
+                handleRatingClick(event); 
+            }
+        });
+
+        // Delegación de Eventos para el Modal de Descripción (Info)
+        document.getElementById('calificacion-table-body').addEventListener('click', (event) => {
+            const target = event.target.closest('[data-action="show-details"]');
+            if (target) {
+                const projectId = parseInt(target.getAttribute('data-id'));
+                showProjectDetails(projectId);
+            }
+        });
+
+        // Event listener para el nombre del usuario (Guardado en cambio y cada vez que vota)
+        userNameInput.addEventListener('change', saveUserRatings);
+        
+        // Event Listener para el Chart Tooltip
+        document.getElementById('quadrant-chart').addEventListener('mousemove', handleChartMouseMove);
+        document.getElementById('quadrant-chart').addEventListener('mouseleave', () => {
+            document.getElementById('chart-tooltip').classList.remove('visible');
+            currentTooltip = null;
+        });
+    };
+
+    // Escuchar el evento de redimensionamiento para redibujar el gráfico
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            if (currentTab === 'matriz') {
+                drawQuadrantChart(currentAveragedProjects);
+            }
+        }, 150); // Debounce de 150ms
+    });
+
+</script>
